@@ -1,0 +1,8 @@
+[functions.generate-topics]
+verify_jwt = false
+
+[functions.generate-subtopics]
+verify_jwt = false
+
+[functions.generate-lesson]
+verify_jwt = false
