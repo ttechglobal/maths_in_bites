@@ -736,7 +736,6 @@ function AdminGenerateLessons() {
     stopAllRef.current = false;
     setLoadingTopics(true);
 
-    // Note: no is_active filter — works even if column missing or null
     const { data: topicRows, error: topicErr } = await supabase
       .from('topics').select('id,name,icon,sort_order')
       .eq('learning_path_id', lp.id)
@@ -748,12 +747,16 @@ function AdminGenerateLessons() {
       return;
     }
 
-    const built = [];
+    // Show topic shells immediately — subtopics load progressively
+    const shells = (topicRows || []).map(t => ({ ...t, subtopics: null }));
+    setTopics(shells);
+    setLoadingTopics(false); // stop full-screen spinner now
+
+    // Stream in each topic's subtopics + lesson status one by one
     for (const t of topicRows || []) {
       const { data: subs } = await supabase
         .from('subtopics').select('id,name,sort_order')
-        .eq('topic_id', t.id)
-        .order('sort_order');
+        .eq('topic_id', t.id).order('sort_order');
 
       const subIds = (subs || []).map(s => s.id);
       let lessonSet = new Set();
@@ -762,15 +765,14 @@ function AdminGenerateLessons() {
           .from('lessons').select('subtopic_id').in('subtopic_id', subIds);
         lessonSet = new Set((lessons || []).map(l => l.subtopic_id));
       }
-      built.push({
-        ...t,
+
+      setTopics(prev => prev.map(pt => pt.id !== t.id ? pt : {
+        ...pt,
         subtopics: (subs || []).map(s => ({
           ...s, topicId: t.id, topicName: t.name, hasLesson: lessonSet.has(s.id),
         })),
-      });
+      }));
     }
-    setTopics(built);
-    setLoadingTopics(false);
   };
 
   const addLog = (topicId, entry) =>
@@ -878,7 +880,7 @@ function AdminGenerateLessons() {
 
     for (const topic of topics) {
       if (stopAllRef.current) break;
-      const pending = topic.subtopics.filter(s => !s.hasLesson);
+      const pending = (topic.subtopics || []).filter(s => !s.hasLesson);
       if (!pending.length) continue;
 
       setExpandedTopic(topic.id);
@@ -902,8 +904,8 @@ function AdminGenerateLessons() {
     pausedRef.current = false;
   };
 
-  const totalSubs    = topics.reduce((a, t) => a + t.subtopics.length, 0);
-  const doneCount    = topics.reduce((a, t) => a + t.subtopics.filter(s => s.hasLesson).length, 0);
+  const totalSubs    = topics.reduce((a, t) => a + (t.subtopics?.length ?? 0), 0);
+  const doneCount    = topics.reduce((a, t) => a + (t.subtopics?.filter(s => s.hasLesson).length ?? 0), 0);
   const pendingCount = totalSubs - doneCount;
   const anyRunning   = runningTopics.size > 0 || generatingAll;
 
@@ -1005,13 +1007,13 @@ function AdminGenerateLessons() {
               {/* ── Per-topic cards ── */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {topics.map(topic => {
-                  const topicDone    = topic.subtopics.filter(s => s.hasLesson).length;
-                  const topicPending = topic.subtopics.length - topicDone;
+                  const topicDone    = (topic.subtopics || []).filter(s => s.hasLesson).length;
+                  const topicPending = (topic.subtopics || []).length - topicDone;
                   const isRunning    = runningTopics.has(topic.id);
                   const isExpanded   = expandedTopic === topic.id;
                   const topicLog     = log[topic.id] || [];
-                  const pct = topic.subtopics.length > 0
-                    ? Math.round((topicDone / topic.subtopics.length) * 100) : 0;
+                  const pct = (topic.subtopics || []).length > 0
+                    ? Math.round((topicDone / (topic.subtopics || []).length) * 100) : 0;
 
                   return (
                     <div key={topic.id} className="card" style={{
@@ -1062,7 +1064,7 @@ function AdminGenerateLessons() {
                               }} />
                             </div>
                             <span style={{ fontSize: 12, fontWeight: 700, color: C.muted }}>
-                              {topicDone}/{topic.subtopics.length}
+                              {topicDone}/{(topic.subtopics || []).length}
                               {topicPending > 0 && <span style={{ color: C.fire }}> · {topicPending} left</span>}
                             </span>
                           </div>
@@ -1089,7 +1091,7 @@ function AdminGenerateLessons() {
                                 e.stopPropagation();
                                 if (!confirm(`Delete and regenerate ALL lessons for "${topic.name}"?`)) return;
                                 // Delete all lessons for this topic's subtopics
-                                const subIds = topic.subtopics.map(s => s.id);
+                                const subIds = (topic.subtopics || []).map(s => s.id);
                                 if (subIds.length) await supabase.from('lessons').delete().in('subtopic_id', subIds);
                                 // Reset hasLesson flags
                                 setTopics(ts => ts.map(t => t.id !== topic.id ? t : {
@@ -1127,7 +1129,7 @@ function AdminGenerateLessons() {
 
                           {/* Subtopic checklist */}
                           <div style={{ padding: '10px 16px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {topic.subtopics.map((sub, si) => (
+                            {(topic.subtopics || []).map((sub, si) => (
                               <div key={sub.id} style={{
                                 display: 'flex', alignItems: 'center', gap: 10,
                                 padding: '7px 12px', borderRadius: 10, background: '#fff',
@@ -1168,7 +1170,7 @@ function AdminGeneratePractice() {
   const [generating,     setGenerating]     = useState({});    // topicId → bool
   const [topicCounts,    setTopicCounts]    = useState({});    // topicId → number
   const [topicLogs,      setTopicLogs]      = useState({});    // topicId → [{type,msg}]
-  const [questionsCount, setQuestionsCount] = useState(40);
+  const [questionsCount, setQuestionsCount] = useState(60);
   const [reviewTopic,    setReviewTopic]    = useState(null);  // for modal
 
   useEffect(() => {
@@ -1181,25 +1183,30 @@ function AdminGeneratePractice() {
     setLoadingTopics(true);
     const { data: topicRows } = await supabase.from('topics')
       .select('id,name,icon,sort_order').eq('learning_path_id', lp.id).order('sort_order');
-    const built = [];
+
+    // Show topic shells immediately
+    const shells = (topicRows || []).map(t => ({ ...t, subtopics: null }));
+    setTopics(shells);
+    setLoadingTopics(false);
+
+    // Stream in subtopics + question counts per topic
     for (const t of topicRows || []) {
       const { data: subs } = await supabase.from('subtopics')
         .select('id,name,sort_order').eq('topic_id', t.id).order('sort_order');
-      built.push({ ...t, subtopics: subs || [] });
+      const subList = subs || [];
+
+      setTopics(prev => prev.map(pt => pt.id !== t.id ? pt : { ...pt, subtopics: subList }));
+
+      const subIds = subList.map(s => s.id);
+      if (subIds.length) {
+        const { count } = await supabase.from('practice_questions')
+          .select('id', { count: 'exact', head: true })
+          .in('subtopic_id', subIds).eq('category', 'extended');
+        setTopicCounts(prev => ({ ...prev, [t.id]: count ?? 0 }));
+      } else {
+        setTopicCounts(prev => ({ ...prev, [t.id]: 0 }));
+      }
     }
-    setTopics(built);
-    // Load question counts
-    const counts = {};
-    for (const t of built) {
-      const subIds = t.subtopics.map(s => s.id);
-      if (!subIds.length) { counts[t.id] = 0; continue; }
-      const { count } = await supabase.from('practice_questions')
-        .select('id', { count: 'exact', head: true })
-        .in('subtopic_id', subIds).eq('category', 'extended');
-      counts[t.id] = count ?? 0;
-    }
-    setTopicCounts(counts);
-    setLoadingTopics(false);
   };
 
   const addLog = (topicId, entry) =>
@@ -1213,9 +1220,9 @@ function AdminGeneratePractice() {
 
     const session = (await supabase.auth.getSession()).data.session;
     const token   = session?.access_token ?? SUPABASE_ANON_KEY;
-    // Distribute questionsCount across subtopics
-    const subs   = topic.subtopics;
-    const perSub = Math.max(5, Math.ceil(questionsCount / Math.max(1, subs.length)));
+    // questionsCount = per subtopic (not total)
+    const subs   = topic.subtopics || [];
+    const perSub = questionsCount;  // each subtopic gets this many questions
     let totalNew = 0;
 
     for (let i = 0; i < subs.length; i++) {
@@ -1225,7 +1232,11 @@ function AdminGeneratePractice() {
       try {
         const res  = await fetch(`${SUPABASE_URL}/functions/v1/generate-practice`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${token}`,
+          },
           body: JSON.stringify({ subtopic_id: sub.id, count: perSub }),
         });
         const json = await res.json();
@@ -1246,7 +1257,7 @@ function AdminGeneratePractice() {
     setGenerating(g => ({ ...g, [topic.id]: false }));
 
     // Refresh count for this topic
-    const subIds = topic.subtopics.map(s => s.id);
+    const subIds = (topic.subtopics || []).map(s => s.id);
     const { count: newCount } = await supabase.from('practice_questions')
       .select('id', { count: 'exact', head: true })
       .in('subtopic_id', subIds).eq('category', 'extended');
@@ -1255,7 +1266,7 @@ function AdminGeneratePractice() {
 
   const deleteTopicQuestions = async (topic) => {
     if (!confirm(`Delete ALL practice questions for "${topic.name}"? This cannot be undone.`)) return;
-    const subIds = topic.subtopics.map(s => s.id);
+    const subIds = (topic.subtopics || []).map(s => s.id);
     await supabase.from('practice_questions').delete()
       .in('subtopic_id', subIds).eq('category', 'extended');
     setTopicCounts(c => ({ ...c, [topic.id]: 0 }));
@@ -1318,9 +1329,9 @@ function AdminGeneratePractice() {
               </div>
               {/* Count picker */}
               <div style={{ background: '#fff', border: '1.5px solid #E8E8EE', borderRadius: 14, padding: '10px 16px' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>QUESTIONS PER TOPIC</div>
+                <div style={{ fontWeight: 800, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>QUESTIONS PER SUBTOPIC</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {[20, 40, 60, 100].map(n => (
+                  {[20, 30, 40, 50].map(n => (
                     <div key={n} onClick={() => setQuestionsCount(n)} style={{
                       padding: '6px 14px', borderRadius: 8, cursor: 'pointer',
                       fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 15,
@@ -1356,7 +1367,7 @@ function AdminGeneratePractice() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontFamily: "'Baloo 2'", fontWeight: 800, fontSize: 15, color: C.navy }}>{topic.name}</div>
                         <div style={{ fontSize: 12, fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <span style={{ color: C.muted }}>{topic.subtopics.length} subtopics</span>
+                          <span style={{ color: C.muted }}>{(topic.subtopics || []).length} subtopics</span>
                           {hasQs
                             ? <span style={{ color: '#2a9d78', fontWeight: 800 }}>✅ {count} questions</span>
                             : <span style={{ color: C.fire }}>No questions yet</span>
@@ -1382,7 +1393,7 @@ function AdminGeneratePractice() {
                           cursor: isRunning ? 'wait' : 'pointer',
                           transition: 'all 0.15s',
                         }}>
-                          {isRunning ? '⏳ Generating…' : hasQs ? '➕ Add More' : `⚡ Generate ${questionsCount}`}
+                          {isRunning ? '⏳ Generating…' : hasQs ? '➕ Add More' : `⚡ Generate ${questionsCount}/subtopic`}
                         </button>
                         {hasQs && !isRunning && (
                           <button onClick={() => deleteTopicQuestions(topic)} style={{
@@ -1411,7 +1422,7 @@ function AdminGeneratePractice() {
                           </div>
                         ) : (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                            {topic.subtopics.map(s => (
+                            {(topic.subtopics || []).map(s => (
                               <div key={s.id} style={{ fontSize: 13, fontWeight: 600, color: C.muted, padding: '3px 0', borderBottom: '1px dashed #E8E8EE' }}>
                                 🎯 {s.name}
                               </div>
@@ -1440,7 +1451,7 @@ function PracticeReviewModal({ topic, onClose }) {
   const [expanded,  setExpanded]  = useState(null);
 
   useEffect(() => {
-    const subIds = topic.subtopics.map(s => s.id);
+    const subIds = (topic.subtopics || []).map(s => s.id);
     if (!subIds.length) { setLoading(false); return; }
     supabase.from('practice_questions')
       .select('id,question,options,answer,explanation,difficulty,source,subtopic_id')

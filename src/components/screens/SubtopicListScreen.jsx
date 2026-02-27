@@ -168,17 +168,16 @@ function GeneratingSubtopics({ topicName, icon }) {
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: '80px 24px', textAlign: 'center' }}>
       <div style={{ fontSize: 72, marginBottom: 20, animation: 'pulse 1.5s ease-in-out infinite' }}>
-        🧠
+        {icon || '📖'}
       </div>
       <h2 style={{ fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 26, color: C.navy, marginBottom: 12 }}>
-        Building your learning path…
+        Getting lessons ready…
       </h2>
       <p style={{ color: C.muted, fontWeight: 600, fontSize: 15, lineHeight: 1.75, marginBottom: 8 }}>
-        AI is breaking <strong style={{ color: C.fire }}>{topicName || 'this topic'}</strong> into
-        bite-sized lessons tailored for you.
+        Lessons for <strong style={{ color: C.fire }}>{topicName || 'this topic'}</strong> are being prepared. Check back in a moment!
       </p>
       <p style={{ color: C.muted, fontWeight: 600, fontSize: 13, marginBottom: 36 }}>
-        This only happens once — takes about 10 seconds.
+        This only happens once — just a few seconds ✨
       </p>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 10 }}>
         {[0, 1, 2, 3].map(i => (
@@ -189,7 +188,6 @@ function GeneratingSubtopics({ topicName, icon }) {
           }} />
         ))}
       </div>
-      {/* Preview cards — show skeleton of what's coming */}
       <div style={{ marginTop: 48, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="skeleton" style={{ height: 72, borderRadius: 18, opacity: 0.4 + i * 0.1 }} />

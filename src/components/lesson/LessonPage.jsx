@@ -17,7 +17,7 @@ import RichText from '../ui/RichText';
 import Confetti from '../ui/Confetti';
 import XPPopup from '../ui/XPPopup';
 
-export default function LessonPage({ subtopic, userId, onBack, onComplete, onPracticeMore }) {
+export default function LessonPage({ subtopic, userId, onBack, onComplete, onNext, onPracticeMore }) {
   const { lesson, examples, questions, status, error } = useLesson(subtopic?.id ?? null);
   const { saveProgress } = useProgress(userId);
 
@@ -36,6 +36,7 @@ export default function LessonPage({ subtopic, userId, onBack, onComplete, onPra
       saveProgress={saveProgress}
       onBack={onBack}
       onComplete={onComplete}
+      onNext={onNext || onBack}
       onPracticeMore={onPracticeMore}
     />
   );
@@ -206,7 +207,7 @@ function ExampleCard({ example, index }) {
   );
 }
 // ── Main lesson content (only rendered once lesson is loaded) ─
-function LessonContent({ lesson: rawLesson, examples, questions, subtopic, userId, saveProgress, onBack, onComplete, onPracticeMore }) {
+function LessonContent({ lesson: rawLesson, examples, questions, subtopic, userId, saveProgress, onBack, onComplete, onNext, onPracticeMore }) {
   const lesson = parseLessonJSON(rawLesson);
   const [answers,   setAnswers]   = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -236,6 +237,9 @@ function LessonContent({ lesson: rawLesson, examples, questions, subtopic, userI
         setSaving(true);
         await saveProgress(subtopic.id, correct, xpEarned);
         setSaving(false);
+        // Immediately refresh completion state so the subtopic list updates
+        // without needing a page reload
+        onComplete?.();
       }
     }
   };
@@ -391,7 +395,7 @@ function LessonContent({ lesson: rawLesson, examples, questions, subtopic, userI
                         🎯 Practice More
                       </ActionBtn>
                     )}
-                    <ActionBtn onClick={onComplete} color={C.mint} style={{ flex: 1 }}>
+                    <ActionBtn onClick={onNext} color={C.mint} style={{ flex: 1 }}>
                       Next Lesson →
                     </ActionBtn>
                   </div>
@@ -623,16 +627,17 @@ function LessonSkeleton({ onBack }) {
 function LessonGenerating({ subtopic, onBack }) {
   return (
     <div style={{ maxWidth: 480, margin: '0 auto', padding: '80px 24px', textAlign: 'center' }}>
-      <div style={{ fontSize: 72, marginBottom: 20, animation: 'pulse 1.5s ease-in-out infinite' }}>✨</div>
+      <div style={{ fontSize: 72, marginBottom: 20, animation: 'pulse 1.5s ease-in-out infinite' }}>📚</div>
       <h2 style={{ fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 26, color: C.navy, marginBottom: 12 }}>
-        Preparing your lesson…
+        Getting your lesson ready…
       </h2>
       <p style={{ color: C.muted, fontWeight: 600, fontSize: 15, lineHeight: 1.7, marginBottom: 10 }}>
-        AI is writing your lesson on{' '}
-        <strong style={{ color: C.fire }}>{subtopic?.name}</strong>.
+        Your lesson on{' '}
+        <strong style={{ color: C.fire }}>{subtopic?.name}</strong>{' '}
+        is being prepared. Hang tight!
       </p>
       <p style={{ color: C.muted, fontWeight: 600, fontSize: 13, marginBottom: 36 }}>
-        This takes about 10–15 seconds.
+        This only takes a few seconds ✨
       </p>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 40 }}>
         {[0, 1, 2].map(i => (

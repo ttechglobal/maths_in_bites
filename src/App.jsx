@@ -1,4 +1,5 @@
 // src/App.jsx
+import { useState, useEffect } from 'react';
 import { useAppState }        from './hooks/useAppState';
 import { useTopics }          from './hooks/useContent';
 import { C }                  from './constants/colors';
@@ -30,8 +31,106 @@ import PracticeModule from './components/lesson/PracticeModule';
 // Admin
 import AdminApp from './components/admin/AdminApp';
 
+// ─────────────────────────────────────────────────────────────
+// App-level exit guard
+// Intercepts browser back button and tab/window close.
+// Shows an encouraging dialog so students don't accidentally leave.
+// ─────────────────────────────────────────────────────────────
+
+const EXIT_MESSAGES = [
+  { headline: "Learning in progress! 🚀", body: "You're building something great. Stay a little longer?" },
+  { headline: "Don't stop now! ⭐", body: "Every question you answer makes you smarter. Keep it up!" },
+  { headline: "Your streak is on the line! 🔥", body: "Come back and keep your learning streak alive." },
+  { headline: "Almost there! 💪", body: "The best students show up even when they don't feel like it." },
+  { headline: "Knowledge waits for no one! 🧠", body: "A few more minutes today = big results tomorrow." },
+];
+
+function useAppExitGuard(onExitRequest) {
+  useEffect(() => {
+    // Intercept browser/tab close (beforeunload)
+    const handleBeforeUnload = (e) => {
+      e.preventDefault();
+      e.returnValue = ''; // triggers browser's native dialog as fallback
+    };
+
+    // Intercept browser back button by pushing a history state
+    // When user presses back, we catch the popstate and show our dialog instead
+    window.history.pushState({ exitGuard: true }, '');
+    const handlePopState = (e) => {
+      // Re-push so back button keeps triggering us
+      window.history.pushState({ exitGuard: true }, '');
+      onExitRequest();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [onExitRequest]);
+}
+
+function AppExitDialog({ onStay, onExit }) {
+  const msg = EXIT_MESSAGES[Math.floor(Math.random() * EXIT_MESSAGES.length)];
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 28, maxWidth: 380, width: '100%',
+        padding: 32, textAlign: 'center',
+        boxShadow: '0 24px 80px rgba(0,0,0,0.22)',
+        animation: 'fadeUp 0.25s ease',
+      }}>
+        <div style={{ fontSize: 52, marginBottom: 14 }}>📚</div>
+        <div style={{
+          fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 22,
+          color: '#1a2340', marginBottom: 10, lineHeight: 1.2,
+        }}>
+          {msg.headline}
+        </div>
+        <p style={{ color: '#7a8599', fontWeight: 600, fontSize: 14, marginBottom: 6, lineHeight: 1.65 }}>
+          {msg.body}
+        </p>
+        <p style={{
+          fontFamily: "'Baloo 2'", fontWeight: 800, fontSize: 13,
+          color: '#FF6B35', marginBottom: 26,
+        }}>
+          Are you sure you want to leave?
+        </p>
+
+        <button onClick={onStay} style={{
+          width: '100%', padding: '14px', borderRadius: 16, border: 'none', marginBottom: 10,
+          background: 'linear-gradient(135deg,#FF6B35,#FF9500)',
+          color: '#fff', fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 17,
+          cursor: 'pointer', boxShadow: '0 4px 16px rgba(255,107,53,0.4)',
+        }}>
+          Stay & Keep Learning! 🔥
+        </button>
+
+        <button onClick={onExit} style={{
+          width: '100%', padding: '12px', borderRadius: 16,
+          border: '2px solid #E8E8EE', background: 'transparent',
+          color: '#aab0be', fontFamily: "'Baloo 2'", fontWeight: 700, fontSize: 14,
+          cursor: 'pointer',
+        }}>
+          Exit anyway
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const app = useAppState();
+  const [showExitDialog, setShowExitDialog] = useState(false);
+
+  // Intercept back button and tab close at the app level
+  useAppExitGuard(() => setShowExitDialog(true));
 
   const { topics, status: topicsStatus } = useTopics(
     app.learningPath?.id ?? null,
@@ -89,6 +188,17 @@ export default function App() {
   // ── Main App ──────────────────────────────────────────────────
   return (
     <div style={{ background:C.bg, minHeight:'100vh' }}>
+      {/* App-level exit guard — shows when user tries to close/navigate away */}
+      {showExitDialog && (
+        <AppExitDialog
+          onStay={() => setShowExitDialog(false)}
+          onExit={() => {
+            setShowExitDialog(false);
+            // Let browser navigate away naturally
+            window.history.back();
+          }}
+        />
+      )}
       <TopBar user={user} onAdminClick={() => app.setShowAdmin(true)} />
 
       {/* Practice mode */}
@@ -96,6 +206,7 @@ export default function App() {
         <PracticeModule
           subtopicId={app.subtopic?.id}
           subtopic={app.subtopic}
+          userId={app.authUser?.id ?? null}
           onBack={() => app.setPracticeMode(false)}
         />
 
@@ -105,11 +216,8 @@ export default function App() {
           subtopic={app.subtopic}
           userId={app.authUser?.id ?? null}
           onBack={() => { app.setLessonOpen(false); app.setSubtopic(null); }}
-          onComplete={async () => {
-            app.setLessonOpen(false);
-            app.setSubtopic(null);
-            await app.refreshAfterComplete();   // ← refreshes both completedIds AND profile XP
-          }}
+          onComplete={app.refreshAfterComplete}
+          onNext={() => { app.setLessonOpen(false); app.setSubtopic(null); }}
           onPracticeMore={() => app.setPracticeMode(true)}
         />
 
