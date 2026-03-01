@@ -23,13 +23,11 @@ import TopicListScreen    from './components/screens/TopicListScreen';
 import SubtopicListScreen from './components/screens/SubtopicListScreen';
 import PracticeScreen     from './components/screens/PracticeScreen';
 import SettingsScreen     from './components/screens/SettingsScreen';
+import SchoolModeScreen   from './components/screens/SchoolModeScreen';
 
 // Lesson
 import LessonPage     from './components/lesson/LessonPage';
 import PracticeModule from './components/lesson/PracticeModule';
-
-// Admin
-import AdminApp from './components/admin/AdminApp';
 
 // ─────────────────────────────────────────────────────────────
 // App-level exit guard
@@ -153,9 +151,6 @@ export default function App() {
     );
   }
 
-  // ── Admin ─────────────────────────────────────────────────────
-  if (app.showAdmin) return <AdminApp onExitAdmin={() => app.setShowAdmin(false)} />;
-
   // ── Auth (not logged in) ──────────────────────────────────────
   if (!app.authUser) return <AuthScreen onAuthSuccess={() => {}} />;
 
@@ -199,7 +194,7 @@ export default function App() {
           }}
         />
       )}
-      <TopBar user={user} onAdminClick={() => app.setShowAdmin(true)} />
+      <TopBar user={user} onNavigate={app.switchScreen} />
 
       {/* Practice mode */}
       {app.lessonOpen && app.practiceMode ? (
@@ -249,16 +244,25 @@ export default function App() {
             />
           )}
           {app.screen === 'learn' && (
-            <TopicListScreen
-              grade={app.profile?.grade || 'SS2'}
-              mode={app.profile?.mode  || 'school'}
-              topics={topics}
-              status={topicsStatus}
-              completedIds={app.completedIds}
-              onSelectTopic={app.selectTopic}
-              isAdmin={app.profile?.is_admin || false}
-              onAdminUpload={() => app.setShowAdmin(true)}
-            />
+            app.profile?.mode === 'school' ? (
+              <SchoolModeScreen
+                grade={app.profile?.grade || 'JSS1'}
+                learningPathId={app.learningPath?.id ?? null}
+                completedIds={app.completedIds}
+                onSelectSubtopic={(sub) => {
+                  app.selectSubtopic(sub);
+                }}
+              />
+            ) : (
+              <TopicListScreen
+                grade={app.profile?.grade || 'SS2'}
+                mode={app.profile?.mode  || 'exam'}
+                topics={topics}
+                status={topicsStatus}
+                completedIds={app.completedIds}
+                onSelectTopic={app.selectTopic}
+              />
+            )
           )}
           {app.screen === 'practice' && (
             <PracticeScreen
@@ -273,7 +277,6 @@ export default function App() {
               mode={app.profile?.mode}
               onSaveName={name => app.updateProfile({ name })}
               onSaveClass={app.handleSaveClass}
-              onAdminClick={() => app.setShowAdmin(true)}
             />
           )}
           <BottomNav screen={app.screen} onNavigate={app.switchScreen} />

@@ -1,16 +1,19 @@
 // src/components/auth/AuthScreen.jsx
 // ============================================================
 // Sign in / Sign up screen. Shown when user is not logged in.
+// On signup: collects name + email + password, then immediately
+// saves name to user_profiles so onboarding skips the name step
+// and goes straight to class/exam selection.
 // ============================================================
 
 import { useState } from "react";
 import { C } from '../../constants/colors';
-import { signIn, signUp } from '../../lib/supabase';
+import { supabase, signIn, signUp } from '../../lib/supabase';
 import Btn from '../ui/Btn';
 import FloatingMathBg from '../ui/FloatingMathBg';
 
 export default function AuthScreen({ onAuthSuccess }) {
-  const [tab,      setTab]      = useState("signin");  // "signin" | "signup"
+  const [tab,      setTab]      = useState("signin");
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [name,     setName]     = useState("");
@@ -22,21 +25,35 @@ export default function AuthScreen({ onAuthSuccess }) {
     setLoading(true);
     setError(null);
 
-    let result;
     if (tab === "signup") {
       if (!name.trim()) { setError("Please enter your name"); setLoading(false); return; }
-      result = await signUp(email, password, name.trim());
+
+      const result = await signUp(email, password, name.trim());
+      if (result.error) {
+        setError(result.error.message);
+        setLoading(false);
+        return;
+      }
+
+      // Upsert name directly — don't rely solely on the DB trigger
+      const userId = result.data?.user?.id;
+      if (userId) {
+        await supabase
+          .from('user_profiles')
+          .upsert({ id: userId, name: name.trim() }, { onConflict: 'id' });
+      }
+
+      onAuthSuccess?.();
     } else {
-      result = await signIn(email, password);
+      const result = await signIn(email, password);
+      if (result.error) {
+        setError(result.error.message);
+      } else {
+        onAuthSuccess?.();
+      }
     }
 
     setLoading(false);
-
-    if (result.error) {
-      setError(result.error.message);
-    } else {
-      onAuthSuccess?.();
-    }
   };
 
   return (

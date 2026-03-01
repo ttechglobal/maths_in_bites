@@ -82,7 +82,8 @@ export function useAppState() {
 
     if (!authUser) { setPhase('splash'); return; }
 
-    if (!profile?.name)              { setPhase('name');        return; }
+    // Name is collected during signup — skip name phase if already set
+    if (!profile?.name)                    { setPhase('name');        return; }
     if (!profile?.grade || !profile?.mode) { setPhase('levelSelect'); return; }
 
     setPhase('app');
@@ -92,10 +93,22 @@ export function useAppState() {
   useEffect(() => {
     if (!profile?.grade || !profile?.mode) { setLearningPath(null); return; }
     let cancelled = false;
+
+    // Grade aliases — profile might store 'JS1' but DB row might be 'JSS1' or vice versa
+    const gradeAliases = {
+      'JS1': ['JS1','JSS1','JSS 1'],
+      'JS2': ['JS2','JSS2','JSS 2'],
+      'JS3': ['JS3','JSS3','JSS 3'],
+      'JSS1': ['JSS1','JS1','JSS 1'],
+      'JSS2': ['JSS2','JS2','JSS 2'],
+      'JSS3': ['JSS3','JS3','JSS 3'],
+    };
+    const gradesToTry = gradeAliases[profile.grade] || [profile.grade];
+
     supabase
       .from('learning_paths')
       .select('id, name, slug, mode, grade, has_curriculum, icon')
-      .eq('grade', profile.grade)
+      .in('grade', gradesToTry)
       .eq('mode',  profile.mode)
       .eq('is_active', true)
       .maybeSingle()
@@ -136,7 +149,10 @@ export function useAppState() {
     const examTypes = ['WAEC', 'JAMB', 'NECO', 'GCE', 'BECE', 'IGCSE'];
     const mode = examTypes.includes(grade) ? 'exam' : 'school';
     await updateProfile({ grade, mode });
-    setTopic(null); setSubtopic(null); setLessonOpen(false); setLearningPath(null);
+    // Reset navigation so new content loads
+    setScreen('home');
+    setTopic(null); setSubtopic(null); setLessonOpen(false);
+    setPracticeMode(false); setLearningPath(null);
   }, [updateProfile]);
 
   // Called during initial onboarding only — sets grade + goes to tutorial

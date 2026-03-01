@@ -77,7 +77,7 @@ export function GeneratingState({ type = "topics", name = "" }) {
 }
 
 // ── NO CURRICULUM: admin hasn't uploaded content yet ─────────
-export function NoCurriculumState({ grade, mode, isAdmin = false, onAdminUpload }) {
+export function NoCurriculumState({ grade, mode }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
       <div style={{ fontSize: 64, marginBottom: 16 }}>📭</div>
@@ -87,26 +87,16 @@ export function NoCurriculumState({ grade, mode, isAdmin = false, onAdminUpload 
       </h2>
 
       <p style={{ color: C.muted, fontWeight: 600, fontSize: 15, lineHeight: 1.75, marginBottom: 28 }}>
-        {isAdmin
-          ? "You haven't uploaded a curriculum for this class yet. Upload one to start generating lessons automatically."
-          : "Lessons for this class haven't been set up yet. Please ask your teacher or admin to upload the curriculum."}
+        Lessons for this class haven't been set up yet. Please ask your teacher or admin to upload the curriculum.
       </p>
 
-      {isAdmin && onAdminUpload && (
-        <Btn onClick={onAdminUpload} size="lg" style={{ width: "100%", maxWidth: 300 }}>
-          📤 Upload Curriculum
-        </Btn>
-      )}
-
-      {!isAdmin && (
-        <div style={{
-          background: `${C.sky}12`, border: `2px solid ${C.sky}33`,
-          borderRadius: 18, padding: "16px 20px",
-          fontSize: 14, fontWeight: 700, color: C.sky,
-        }}>
-          💡 Tip: Other subjects or classes may already have lessons available.
-        </div>
-      )}
+      <div style={{
+        background: `${C.sky}12`, border: `2px solid ${C.sky}33`,
+        borderRadius: 18, padding: "16px 20px",
+        fontSize: 14, fontWeight: 700, color: C.sky,
+      }}>
+        💡 Tip: Other subjects or classes may already have lessons available.
+      </div>
     </div>
   );
 }

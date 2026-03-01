@@ -18,8 +18,6 @@ export default function TopicListScreen({
   error,
   completedIds = [],
   onSelectTopic,
-  isAdmin = false,
-  onAdminUpload,
 }) {
   const accent = PAGE_ACCENTS.learn;
   // Topics from DB don't include subtopics array; show '?' for counts until subtopics load
@@ -29,7 +27,7 @@ export default function TopicListScreen({
   // ── State gates ──────────────────────────────────────────────
   if (status === 'loading')       return <ListSkeleton count={5} />;
   if (status === 'generating')    return <GeneratingState type="topics" name={grade} />;
-  if (status === 'no_curriculum') return <NoCurriculumState grade={grade} mode={mode} isAdmin={isAdmin} onAdminUpload={onAdminUpload} />;
+  if (status === 'no_curriculum') return <NoCurriculumState grade={grade} mode={mode} />;
   if (status === 'error')         return <ErrorState message={error} />;
 
   return (

@@ -1,23 +1,55 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C } from '../../constants/colors';
 import { PAGE_ACCENTS } from '../../constants/accents';
-import { SCHOOL_CLASSES, EXAM_TYPES } from '../../constants/curriculum';
+import { EXAM_TYPES } from '../../constants/curriculum';
+import { SCHOOL_LEVELS } from '../../types';
 import Pill from '../ui/Pill';
 import Btn from '../ui/Btn';
 
-export default function SettingsScreen({ user, grade, mode, onSaveName, onSaveClass, onAdminClick }) {
+// Display labels — must match LevelSelect exactly
+const SCHOOL_LABELS = {
+  JS1: 'JSS 1', JS2: 'JSS 2', JS3: 'JSS 3',
+  SS1: 'SS 1',  SS2: 'SS 2',  SS3: 'SS 3',
+};
+
+export default function SettingsScreen({ user, grade, mode, onSaveName, onSaveClass }) {
   const accent = PAGE_ACCENTS.settings;
+
+  // editClass is what the user has selected in the UI
   const [editName,  setEditName]  = useState(user?.name || "");
-  const [editClass, setEditClass] = useState(grade || "SS2");
+  const [editClass, setEditClass] = useState(grade || "SS1");
+  const [saving,    setSaving]    = useState(false);
   const [saved,     setSaved]     = useState(false);
 
-  const hasChanges = editName.trim() !== (user?.name || "") || editClass !== grade;
+  // savedClass tracks the last value actually committed to the DB.
+  // We use a ref so updating it never triggers a re-render that would
+  // re-lock the Save button. It starts at the prop value (current DB value).
+  const savedClassRef = useRef(grade || "SS1");
+  const savedNameRef  = useRef(user?.name || "");
 
-  const handleSave = () => {
-    if (editName.trim()) onSaveName(editName.trim());
-    onSaveClass(editClass);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  // Only sync name display when it changes from outside (e.g. another session)
+  useEffect(() => { setEditName(user?.name || ""); }, [user?.name]);
+  // NOTE: intentionally NO useEffect for grade — we manage that via savedClassRef
+
+  const nameChanged  = editName.trim() !== savedNameRef.current;
+  const classChanged = editClass !== savedClassRef.current;
+  const hasChanges   = nameChanged || classChanged;
+
+  const handleSave = async () => {
+    if (!editName.trim()) return;
+    const didChangeClass = classChanged;
+    setSaving(true);
+    if (nameChanged) {
+      await onSaveName(editName.trim());
+      savedNameRef.current = editName.trim();
+    }
+    if (classChanged) {
+      await onSaveClass(editClass);
+      savedClassRef.current = editClass;
+    }
+    setSaving(false);
+    setSaved(didChangeClass ? 'class' : 'name');
+    setTimeout(() => setSaved(false), 2500);
   };
 
   return (
@@ -52,14 +84,14 @@ export default function SettingsScreen({ user, grade, mode, onSaveName, onSaveCl
 
         <div style={{ fontSize: 11, fontWeight: 800, color: C.muted, letterSpacing: 0.8, marginBottom: 8 }}>SCHOOL</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
-          {SCHOOL_CLASSES.map(cls => (
+          {SCHOOL_LEVELS.map(cls => (
             <div key={cls} onClick={() => setEditClass(cls)} style={{
               padding: "8px 16px", borderRadius: 50, cursor: "pointer", fontWeight: 800, fontSize: 13,
               border: `2px solid ${editClass === cls ? accent.primary : C.border}`,
               background: editClass === cls ? `${accent.primary}15` : "#fff",
               color: editClass === cls ? accent.primary : C.muted,
               transition: "all 0.18s",
-            }}>{cls}</div>
+            }}>{SCHOOL_LABELS[cls] || cls}</div>
           ))}
         </div>
 
@@ -78,20 +110,17 @@ export default function SettingsScreen({ user, grade, mode, onSaveName, onSaveCl
       </div>
 
       <div className="anim-fadeUp" style={{ animationDelay: "0.11s" }}>
-        <Btn onClick={handleSave} disabled={!hasChanges && !saved} size="lg" color={accent.primary} style={{ width: "100%", boxShadow: `0 5px 0 ${accent.primary}55` }}>
-          {saved ? "✅ Saved!" : "Save Changes"}
+        <Btn onClick={handleSave} disabled={!hasChanges || saving} size="lg" color={accent.primary} style={{ width: "100%", boxShadow: `0 5px 0 ${accent.primary}55` }}>
+          {saving ? "Saving…" : saved ? "✅ Saved!" : "Save Changes"}
         </Btn>
       </div>
 
       {saved && (
         <div className="anim-fadeIn" style={{ marginTop: 12, textAlign: "center", fontSize: 13, fontWeight: 700, color: C.mint }}>
-          {editClass !== grade ? "Class updated — topics refreshed across the app ✨" : "Profile updated successfully!"}
+          {saved === 'class' ? "Class updated — topics refreshed ✨" : "Profile updated successfully!"}
         </div>
       )}
 
-      <Btn color={C.navy} onClick={onAdminClick} style={{ width: "100%", marginTop: 16 }}>
-        🔐 Admin Dashboard
-      </Btn>
     </div>
   );
 }

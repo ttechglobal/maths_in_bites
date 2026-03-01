@@ -21,8 +21,11 @@ const NAV = [
   { id: "flagged",    icon: "🚩", label: "Flagged Qs"       },
 ];
 
-export default function AdminApp({ onExitAdmin }) {
+export default function AdminApp({ adminUser, onLogout, onExitAdmin }) {
   const [tab, setTab] = useState("overview");
+
+  // Support both the new onLogout (from AdminPortal) and the legacy onExitAdmin
+  const handleExit = onLogout || onExitAdmin;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: "#F5F2EC" }}>
@@ -33,6 +36,11 @@ export default function AdminApp({ onExitAdmin }) {
         <div style={{ padding: "0 20px 24px", borderBottom: "1px solid rgba(255,255,255,0.12)" }}>
           <div style={{ fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 20, color: "#fff" }}>🧮 Admin</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", fontWeight: 600, marginTop: 2 }}>MathsInBites CMS</div>
+          {adminUser?.email && (
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", fontWeight: 600, marginTop: 4, wordBreak: "break-all" }}>
+              {adminUser.email}
+            </div>
+          )}
         </div>
         <nav style={{ flex: 1, padding: "16px 12px" }}>
           {NAV.map(({ id, icon, label }) => (
@@ -48,12 +56,16 @@ export default function AdminApp({ onExitAdmin }) {
           ))}
         </nav>
         <div style={{ padding: "0 12px" }}>
-          <div onClick={onExitAdmin} style={{
+          <div onClick={handleExit} style={{
             display: "flex", alignItems: "center", gap: 10,
             padding: "10px 12px", borderRadius: 12, cursor: "pointer",
             color: "rgba(255,255,255,0.45)", fontWeight: 700, fontSize: 14,
-          }}>
-            ← Exit Admin
+            transition: "all 0.18s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.8)"}
+          onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.45)"}
+          >
+            🚪 Log Out
           </div>
         </div>
       </div>

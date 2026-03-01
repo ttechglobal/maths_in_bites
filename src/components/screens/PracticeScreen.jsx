@@ -174,7 +174,8 @@ function ModeCard({ icon, iconBg, title, desc, onClick, delay, highlight }) {
 // Random mode — topic selector
 // ─────────────────────────────────────────────────────────────
 function RandomTopicSelector({ topics, selected, onChange, onBack, onNext }) {
-  const allSelected = selected.length === 0;
+  // allSelected = either nothing explicitly chosen (default = all), or every topic is in the list
+  const allSelected = selected.length === 0 || selected.length === topics.length;
   const numSelected = allSelected ? topics.length : selected.length;
 
   const toggle = (id) => {
@@ -207,20 +208,22 @@ function RandomTopicSelector({ topics, selected, onChange, onBack, onNext }) {
           </button>
         </div>
 
-        {/* Row 2: selection status chips */}
+        {/* Row 2: selection status + Select All / Clear */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, fontWeight: 800, color: C.navy }}>
             {allSelected ? `All ${topics.length} topics` : `${numSelected} of ${topics.length} selected`}
           </span>
           <div style={{ flex: 1 }} />
-          <button onClick={() => onChange([])} style={{
+          {/* Select All — sets every topic ID explicitly */}
+          <button onClick={() => onChange(topics.map(t => t.id))} style={{
             padding: '4px 14px', borderRadius: 50, cursor: 'pointer', fontWeight: 700, fontSize: 11,
             border: `1.5px solid ${allSelected ? accent.primary : C.border}`,
             background: allSelected ? `${accent.primary}15` : 'transparent',
             color: allSelected ? accent.primary : C.muted, transition: 'all 0.15s',
           }}>
-            {allSelected ? '✓ All' : 'Select all'}
+            {allSelected ? '✓ All selected' : 'Select all'}
           </button>
+          {/* Clear — only show when something is explicitly selected */}
           {!allSelected && (
             <button onClick={() => onChange([])} style={{
               padding: '4px 14px', borderRadius: 50, cursor: 'pointer', fontWeight: 700, fontSize: 11,

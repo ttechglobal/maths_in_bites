@@ -9,6 +9,12 @@ import Btn from '../ui/Btn';
 import ProgressBar from '../ui/ProgressBar';
 import { ListSkeleton } from '../states/ContentStates';
 
+const GRADE_LABELS = {
+  JS1: 'JSS 1', JS2: 'JSS 2', JS3: 'JSS 3',
+  JSS1: 'JSS 1', JSS2: 'JSS 2', JSS3: 'JSS 3',
+  SS1: 'SS 1', SS2: 'SS 2', SS3: 'SS 3',
+};
+
 export default function HomeScreen({
   user,
   grade,
@@ -45,7 +51,7 @@ export default function HomeScreen({
           borderRadius: 24, padding: "22px 22px 18px",
         }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: accent.primary, marginBottom: 4, letterSpacing: 0.5 }}>
-            {mode === 'exam' ? '📋 EXAM MODE' : '🏫 SCHOOL MODE'} · {grade}
+            {mode === 'exam' ? '📋 EXAM MODE' : '🏫 SCHOOL MODE'} · {GRADE_LABELS[grade] || grade}
           </p>
           <h1 style={{ fontFamily: "'Baloo 2'", fontWeight: 900, fontSize: 26, color: C.navy, marginBottom: 4, lineHeight: 1.2 }}>
             Welcome back,<br />{user?.name || 'Champ'}! 👋
